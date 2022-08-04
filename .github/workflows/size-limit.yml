@@ -1,17 +1,23 @@
-name: "size"
+name: "Check SDK Size"
 on:
   pull_request:
     branches:
       - production
-      - production-staging
+
 jobs:
-  size:
+  size-check:
     runs-on: ubuntu-latest
     env:
       CI_JOB_NUMBER: 1
     steps:
-      - uses: actions/checkout@v1
-      - uses: andresz1/size-limit-action@v1
+      - 
+        name: Checkout
+        uses: actions/checkout@master
+
+      - 
+        name: Size limit check
+        uses: andresz1/size-limit-action@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           build_script: size
+          clean_script: clean

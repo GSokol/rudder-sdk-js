@@ -1,0 +1,72 @@
+name: Staging SDK Release
+
+on:
+  push:
+    branches:
+      - production
+
+env:
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  AWS_DEFAULT_REGION: 'us-east-1'
+
+jobs:
+  staging_release:
+    name: Staging SDK Release
+    runs-on: ubuntu-latest
+    steps:
+      - 
+        name: Checkout
+        uses: actions/checkout@master
+
+      - 
+        name: Setup Node
+        uses: actions/setup-node@v2
+        with:
+          node-version: 14
+
+      - 
+        name: Install dependencies
+        run: npm install
+  
+      -
+        name: Build
+        run: |
+            npm run clean
+            npm run buildProdBrowser
+            npm run buildAllIntegrations
+            npm run buildForNpm
+      
+      - 
+        name: Test
+        run: npm run test
+
+      -
+        name: Set Bugsnag key
+        run: sed -i -e 's|{{RS_BUGSNAG_API_KEY}}|'${{ secrets.RS_BUGSNAG_API_KEY }}'|' dist/rudder-analytics.min.js
+
+      - 
+        name: Prepare files for upload
+        run: |
+            mkdir dist/temp
+            cp dist/integrations/* dist/temp
+
+            for file in dist/temp/*.min.js ; do old_name=$(basename "$file"); old_name=$(echo $old_name.map); new_name=$(echo $old_name | awk '{split($0, tmp, "."); print sprintf("%s-staging.%s.%s.%s", tmp[1], tmp[2], tmp[3], tmp[4])}'); sed -i 's|'$old_name'|'$new_name'|' $file; done
+
+            for file in dist/temp/*.min.js ; do old_name=$(basename "$file"); new_name=$(echo $old_name | awk '{split($0, tmp, "."); print sprintf("%s-staging.%s.%s", tmp[1], tmp[2], tmp[3])}'); mv "dist/temp/$old_name" "dist/temp/$new_name"; done
+
+            for file in dist/temp/*.min.js.map ; do old_name=$(basename "$file"); new_name=$(echo $old_name | awk '{split($0, tmp, "."); print sprintf("%s-staging.%s.%s.%s", tmp[1], tmp[2], tmp[3], tmp[4])}'); mv "dist/temp/$old_name" "dist/temp/$new_name"; done
+
+      - 
+        name: Upload to S3
+        run: |
+            aws s3 cp dist/rudder-analytics.min.js s3://${{ secrets.S3_BUCKET_NAME }}/v1.1/rudder-analytics-staging.min.js --cache-control max-age=3600 --acl public-read
+
+            aws s3 cp dist/rudder-analytics.min.js.map s3://${{ secrets.S3_BUCKET_NAME }}/v1.1/rudder-analytics-staging.min.js.map --cache-control max-age=3600 --acl public-read
+
+            aws s3 cp dist/temp/ s3://${{ secrets.S3_BUCKET_NAME }}/v1.1/js-integrations/ --recursive --cache-control max-age=3600 --acl public-read
+
+      -
+        name: Invalidate CloudFront cache
+        run: |
+            aws cloudfront create-invalidation --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} --paths "/v1.1/rudder-analytics-staging.min.js" "/v1.1/rudder-analytics-staging.min.js.map" "/v1.1/js-integrations"

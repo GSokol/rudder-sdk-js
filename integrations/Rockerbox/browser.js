@@ -66,6 +66,7 @@ class Rockerbox {
       );
     }
     const email = message.traits?.email || message.context?.traits?.email;
+    // firing the identify pixel
     window.RB.track("identify", {
       external_id: userId,
       email,
@@ -74,6 +75,12 @@ class Rockerbox {
   }
 
   track(rudderElement) {
+    // ==support for hybrid mode==
+    // useNativeSDK | useNativeSDKToSend
+    //
+    // T | T -> all events flow via sdk (device mode)
+    // T | F -> all events except track flow via sdk (device mode)
+    // F | T or F -> events will flow via server (cloud mode)
     if (!this.useNativeSDKToSend) {
       logger.info(
         "The useNativeSDKToSend toggle is disabled. Track call will not be sent via device mode."

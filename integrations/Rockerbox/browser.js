@@ -96,7 +96,7 @@ class Rockerbox {
       logger.error("Event name not present");
       return;
     }
-
+    // check if the event name is mapped to a RockerBox event in the UI
     const eventsHashmap = getHashFromArray(this.eventsMap);
     const rbEvent = eventsHashmap[event.toLowerCase()];
     if (rbEvent) {
